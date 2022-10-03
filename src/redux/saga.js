@@ -1,13 +1,12 @@
 import { fork, put, takeLatest } from "redux-saga/effects";
-import { GET_API_REQUEST } from "./constants";
-import { getAPISuccess } from "./actions";
+import { SET_API_REQUEST, GET_API_REQUEST } from "./constants";
 import axios from "axios";
 import { fireRef } from "../firebase/firebase";
-import { set, onValue } from "firebase/database";
+import { set, onValue, get } from "firebase/database";
+import { getAPISuccess, setAPISuccess } from "./actions";
 
-function* getAPI() {
+function* setAPI() {
   try {
-    console.log("getApisaga function");
     const data = yield axios
       .get("https://jsonplaceholder.typicode.com/users")
       .then((res) => {
@@ -17,32 +16,24 @@ function* getAPI() {
       .catch((e) => console.log("get api promise reject", e));
 
     yield set(fireRef, data);
-
-    function* names(snapshot) {
-      console.log("in onvalue");
-
-      const retrivedData = snapshot.val();
-
-      console.log("retrivedData", retrivedData);
-
-      yield put(getAPISuccess(retrivedData));
-    }
-
-    yield onValue(
-      fireRef,
-      (snapshot) => names(snapshot),
-      (e) => console.log("yoyoy", e)
-    );
   } catch (e) {
     console.log("create error", e);
   }
 }
 
-function* getAPISaga() {
+function* getAPI() {
+  try {
+    const data = yield new Promise((resolve) => onValue(fireRef, resolve));
+    if (data.val() !== undefined) yield put(setAPISuccess(data.val()));
+  } catch (error) {}
+}
+
+function* apiSaga() {
   console.log("getApisaga");
+  yield takeLatest(SET_API_REQUEST, setAPI);
   yield takeLatest(GET_API_REQUEST, getAPI);
 }
 
 export default function* rootSaga() {
-  yield fork(getAPISaga);
+  yield fork(apiSaga);
 }
